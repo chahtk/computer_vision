@@ -157,7 +157,7 @@ def backsub():
             BS2.run_avg(BS2.gray, BS2.aWeight)
             print("[press W iwn] : " + str(n))
 
-        #TODO Àß ¾È²¨Áü
+        #TODO Ã€ÃŸ Â¾ÃˆÂ²Â¨ÃÃ¼
         # if the user pressed "q", then stop looping
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
