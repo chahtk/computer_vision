@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import socket
-
+from time import sleep
 
 ####### global ########
 bl=[]
@@ -163,6 +163,10 @@ def backsub():
             cv2.setMouseCallback('select', mouse_select)
             if chk==True and ix != 0 and iy !=0:
                 cv2.rectangle(f,(ix,iy),(xx,yy),(0,255,0),2)
+
+            for i in range(len(BS)):
+                cv2.rectangle(f,(BS[i].left,BS[i].top),(BS[i].right,BS[i].bottom),(0,255,0),2)
+
             cv2.imshow('select',f)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -184,7 +188,8 @@ def backsub():
             n = 0
             for B in BS:
                 B.make_roi(frame, clone, num_frames, n)
-                # print(B.pb)
+
+                # B.pb = sensitive
                 if B.pb > 40 :
                     data+='1/@/'
                 else :
@@ -194,6 +199,7 @@ def backsub():
             data=park_name+'/@/'+str(len(BS))+'/@/'+data
 
             try:
+                sleep(0.3)
                 s.send(bytes(data,encoding='utf-8'))
             except socket.error as e:
                 if chk == False:
