@@ -10,9 +10,11 @@ bl=[]
 tr=[]
 region=[]
 BS=[]
-chk = True
+chk = False
 ix=0
 iy=0
+xx=0
+yy=0
 #######################
 
 class Back_Sub:
@@ -82,7 +84,6 @@ class Back_Sub:
 
     def make_roi(self, frame,clone,num_frames,n):
         aWeight=0.5
-        global chk
         # thresholded=None
 
         # get the ROI
@@ -126,14 +127,18 @@ class Back_Sub:
 
 def mouse_select(event, x, y, flags, param):
 
-    global bl,tr,f
+    global bl,tr,f,ix,iy,xx,yy, chk
 
     if event == cv2.EVENT_LBUTTONDOWN:
+        chk=True
         bl=(x,y)
+        xx,yy=x,y
 
     if event == cv2.EVENT_MOUSEMOVE:
         ix,iy=x,y
+
     if event == cv2.EVENT_LBUTTONUP:
+        chk=False
         tr=(x,y)
         #save bltr
         BS.append(Back_Sub(bl[1],bl[0],tr[1],tr[0]))
@@ -148,6 +153,8 @@ def backsub():
     park_name = 'park1'
     ###################
 
+    global ix,iy,xx,yy,chk
+
     # initialize weight for running average
     # get the reference to the webcam
     camera = cv2.VideoCapture(0)
@@ -158,12 +165,14 @@ def backsub():
     # initialize num of frames
     num_frames = 0
     with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:
-        s.connect(('127.0.0.1',4000))
+        # s.connect(('127.0.0.1',4000))
 
         while True:
             _,f = camera.read()
             f = cv2.flip(f,1)
             cv2.setMouseCallback('select', mouse_select)
+            if chk==True and ix != 0 and iy !=0:
+                cv2.rectangle(f,(ix,iy),(xx,yy),(0,255,0),2)
             cv2.imshow('select',f)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -197,7 +206,9 @@ def backsub():
             try:
                 s.send(bytes(data,encoding='utf-8'))
             except:
-                print('e')
+                if chk == False:
+                    print('socket error')
+                    chk = True
 
             cv2.imshow("Video Feed", clone)
 
