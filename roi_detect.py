@@ -2,8 +2,19 @@
 import cv2
 import imutils
 import numpy as np
+import socket
 
+
+####### global ########
+bl=[]
+tr=[]
+region=[]
+BS=[]
 chk = True
+ix=0
+iy=0
+#######################
+
 class Back_Sub:
 
     def __init__(self,b,l,t,r):
@@ -22,6 +33,7 @@ class Back_Sub:
         self.left = l
         self.gray = None
         self.aWeight=0.5
+        self.pb=0
         # self.run_avg()
         # self.segment()
 
@@ -69,16 +81,14 @@ class Back_Sub:
             return (thresholded, segmented)
 
     def make_roi(self, frame,clone,num_frames,n):
-        global chk
         aWeight=0.5
-
+        global chk
         # thresholded=None
 
         # get the ROI
         '''
         top,bottom,right,left = mouse call back
         '''
-        # print(self.top,self.bottom, self.right,self.left)
         roi = frame[self.bottom:self.top, self.left:self.right]
 
         # convert the roi to grayscale and blur it
@@ -99,101 +109,109 @@ class Back_Sub:
                 # segmented region
                 (thresholded, segmented) = hand
                 # draw the segmented region and display the frame
-                cv2.drawContours(clone, [segmented + (self.left, self.bottom)], -1, (0, 0, 255))
-                # print("Thesholded%d"%n)
+                cv2.drawContours(clone, [segmented + (self. left, self.bottom)], -1, (0, 0, 255))
                 cv2.imshow("%d"%n, thresholded)
 
+                #find how many non zero
+                shape = thresholded.shape
+                size = thresholded.size
+                img = np.zeros(shape, np.uint8)
+                res = cv2.bitwise_or(thresholded, img)
+                nz=np.count_nonzero(res)
+                self.pb=nz/size*100
 
         # draw the segmented hand
         cv2.rectangle(clone, (self.left, self.top), (self.right, self.bottom), (0, 255, 0), 2)
-        if chk == True:
-            print(bl,tr)
-            print(self.bottom,self.left,self.top,self.right)
-            chk = False
-
         return
-
-bl=[]
-tr=[]
-region=[]
-BS=[]
 
 def mouse_select(event, x, y, flags, param):
 
-    global bl,tr
+    global bl,tr,f
 
     if event == cv2.EVENT_LBUTTONDOWN:
         bl=(x,y)
 
+    if event == cv2.EVENT_MOUSEMOVE:
+        ix,iy=x,y
     if event == cv2.EVENT_LBUTTONUP:
         tr=(x,y)
-        # region.append((bl,tr))
-        print(bl[0],tr[0],bl[1],tr[1])
-
         #save bltr
         BS.append(Back_Sub(bl[1],bl[0],tr[1],tr[0]))
-        # print(BS[0].bottom,BS[0].left,BS[0].top,BS[0].right)
+
 #-------------------------------------------------------------------------------
 # Main function
 #-------------------------------------------------------------------------------
 def backsub():
+
+    ###################
+    #####park name#####
+    park_name = 'park1'
+    ###################
+
     # initialize weight for running average
     # get the reference to the webcam
     camera = cv2.VideoCapture(0)
-
     '''
     coord=mouse callback
     top, right, bottom, left = coord
     '''
     # initialize num of frames
     num_frames = 0
-    while True:
-        _,f = camera.read()
-        f = cv2.flip(f,1)
-        cv2.imshow('select',f)
-        cv2.setMouseCallback('select', mouse_select)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    cv2.destroyAllWindows()
-    # make roi and background sub
-    # BS1 = Back_Sub(0,0,200,300)
-    # BS2 = Back_Sub(200,300,300,400)
+    with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:
+        s.connect(('127.0.0.1',4000))
 
-    # keep looping, until interrupted
-    while True:
-        # get the current frame
-        (_, frame) = camera.read()
+        while True:
+            _,f = camera.read()
+            f = cv2.flip(f,1)
+            cv2.setMouseCallback('select', mouse_select)
+            cv2.imshow('select',f)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        cv2.destroyAllWindows()
+        # make roi and background sub
 
-        # flip the frame so that it is not the mirror view
-        frame = cv2.flip(frame, 1)
+        # keep looping, until interrupted
+        while True:
+            # get the current frame
+            (_, frame) = camera.read()
 
-        # clone the frame
-        clone = frame.copy()
+            # flip the frame so that it is not the mirror view
+            frame = cv2.flip(frame, 1)
 
-        # BS1.make_roi(frame, clone, num_frames,n)
-        # BS2.make_roi(frame, clone, num_frames,n+1)
-        # num_frames+=1
-        n = 0
-        for B in BS:
-            B.make_roi(frame, clone, num_frames, n)
-            n += 1
-            num_frames += 1
+            # clone the frame
+            clone = frame.copy()
 
-        cv2.imshow("Video Feed", clone)
-
-        if cv2.waitKey(1) & 0xFF == ord('w'):
-            # BS1.run_avg(BS1.gray, BS1.aWeight)
-            # BS2.run_avg(BS2.gray, BS2.aWeight)
+            data=''
+            n = 0
             for B in BS:
-                B.run_avg(B.gray, B.aWeight)
-            print("[press W iwn] : " + str(n))
+                B.make_roi(frame, clone, num_frames, n)
+                # print(B.pb)
+                if B.pb > 50 :
+                    data+='1'
+                else :
+                    data+='0'
+                n += 1
+                num_frames += 1
+            data=park_name+'/@1#/'+str(len(BS))+'/@!#/'+data
+            # print(data)
+            try:
+                s.send(bytes(data,encoding='utf-8'))
+            except:
+                print('e')
 
-        #TODO 잘 안꺼짐
-        # if the user pressed "q", then stop looping
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+            cv2.imshow("Video Feed", clone)
+
+            if cv2.waitKey(1) & 0xFF == ord('w'):
+                for B in BS:
+                    B.run_avg(B.gray, B.aWeight)
+
+            # if the user pressed "q", then stop looping
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
     # free up memory
+    s.close()
+    print('socket closed')
     camera.release()
     cv2.destroyAllWindows()
     return
