@@ -1,6 +1,4 @@
-# organize imports
 import cv2
-import imutils
 import numpy as np
 import socket
 
@@ -21,13 +19,11 @@ class Back_Sub:
 
     def __init__(self,b,l,t,r):
         '''
-
         :param b: x1
         :param l: y1
         :param t: x2
         :param r: y2
         '''
-        # global variables
         self.bg = None
         self.top = t
         self.bottom = b
@@ -36,12 +32,7 @@ class Back_Sub:
         self.gray = None
         self.aWeight=0.5
         self.pb=0
-        # self.run_avg()
-        # self.segment()
 
-    #-------------------------------------------------------------------------------
-    # Function - To find the running average over the background
-    #-------------------------------------------------------------------------------
     def run_avg(self, image, aWeight):
 
         self.bg
@@ -54,10 +45,6 @@ class Back_Sub:
         # compute weighted average, accumulate it and update the background
         cv2.accumulateWeighted(image, self.bg, aWeight)
 
-    #-------------------------------------------------------------------------------
-    # Function - To segment the region of hand in the image
-    #---
-    # ----------------------------------------------------------------------------
     def segment(self, image, threshold=25):
 
         # find the absolute difference between background and current frame
@@ -84,7 +71,6 @@ class Back_Sub:
 
     def make_roi(self, frame,clone,num_frames,n):
         aWeight=0.5
-        # thresholded=None
 
         # get the ROI
         '''
@@ -111,7 +97,7 @@ class Back_Sub:
                 (thresholded, segmented) = hand
                 # draw the segmented region and display the frame
                 cv2.drawContours(clone, [segmented + (self. left, self.bottom)], -1, (0, 0, 255))
-                cv2.imshow("%d"%n, thresholded)
+                # cv2.imshow("%d"%n, thresholded)
 
                 #find how many non zero
                 shape = thresholded.shape
@@ -164,8 +150,12 @@ def backsub():
     '''
     # initialize num of frames
     num_frames = 0
+
     with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:
-        # s.connect(('127.0.0.1',4000))
+        try:
+            s.connect(('127.0.0.1',4200))
+        except socket.error as e:
+            print(e)
 
         while True:
             _,f = camera.read()
@@ -195,29 +185,30 @@ def backsub():
             for B in BS:
                 B.make_roi(frame, clone, num_frames, n)
                 # print(B.pb)
-                if B.pb > 50 :
-                    data+='1'
+                if B.pb > 40 :
+                    data+='1/@/'
                 else :
-                    data+='0'
+                    data+='0/@/'
                 n += 1
                 num_frames += 1
-            data=park_name+'/@1#/'+str(len(BS))+'/@!#/'+data
-            # print(data)
+            data=park_name+'/@/'+str(len(BS))+'/@/'+data
+
             try:
                 s.send(bytes(data,encoding='utf-8'))
-            except:
+            except socket.error as e:
                 if chk == False:
-                    print('socket error')
+                    print(e)
                     chk = True
 
             cv2.imshow("Video Feed", clone)
 
-            if cv2.waitKey(1) & 0xFF == ord('w'):
+            key = cv2.waitKey(1)
+            if key & 0xFF == ord('w'):
                 for B in BS:
                     B.run_avg(B.gray, B.aWeight)
 
             # if the user pressed "q", then stop looping
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            if key & 0xFF == ord("q"):
                 break
 
     # free up memory
