@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
 import socket
-from time import sleep
+import time
+
+th_pb=20
+ip='192.168.0.53'
 
 ####### global ########
 bl=[]
@@ -14,6 +17,7 @@ iy=0
 xx=0
 yy=0
 #######################
+tt=0
 
 class Back_Sub:
 
@@ -35,8 +39,6 @@ class Back_Sub:
 
     def run_avg(self, image, aWeight):
 
-        self.bg
-
         # initialize the background
         if self.bg is None:
             self.bg = image.copy().astype("float")
@@ -45,7 +47,7 @@ class Back_Sub:
         # compute weighted average, accumulate it and update the background
         cv2.accumulateWeighted(image, self.bg, aWeight)
 
-    def segment(self, image, threshold=25):
+    def segment(self, image, threshold=15):
 
         # find the absolute difference between background and current frame
         diff = cv2.absdiff(self.bg.astype("uint8"), image)
@@ -100,12 +102,8 @@ class Back_Sub:
                 # cv2.imshow("%d"%n, thresholded)
 
                 #find how many non zero
-                shape = thresholded.shape
-                size = thresholded.size
-                img = np.zeros(shape, np.uint8)
-                res = cv2.bitwise_or(thresholded, img)
-                nz=np.count_nonzero(res)
-                self.pb=nz/size*100
+                nz=np.count_nonzero(thresholded)
+                self.pb=nz/thresholded.size*100
 
         # draw the segmented hand
         cv2.rectangle(clone, (self.left, self.top), (self.right, self.bottom), (0, 255, 0), 2)
@@ -139,21 +137,17 @@ def backsub():
     park_name = 'park1'
     ###################
 
-    global ix,iy,xx,yy,chk
+    global ix,iy,xx,yy,chk,th_pb, ip
 
     # initialize weight for running average
     # get the reference to the webcam
     camera = cv2.VideoCapture(0)
-    '''
-    coord=mouse callback
-    top, right, bottom, left = coord
-    '''
     # initialize num of frames
     num_frames = 0
 
     with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:
         try:
-            s.connect(('127.0.0.1',4200))
+            s.connect((ip,4200))
         except socket.error as e:
             print(e)
 
@@ -186,20 +180,22 @@ def backsub():
 
             data=''
             n = 0
+
             for B in BS:
                 B.make_roi(frame, clone, num_frames, n)
-
+                print('B.pb:'+str(B.pb))
                 # B.pb = sensitive
-                if B.pb > 40 :
-                    data+='1/@/'
+                if B.pb > th_pb :
+                    data += '1/@/'
                 else :
-                    data+='0/@/'
+                    data += '0/@/'
                 n += 1
                 num_frames += 1
-            data=park_name+'/@/'+str(len(BS))+'/@/'+data
 
+            data=park_name+'/@/'+str(len(BS))+'/@/'+data
+            # print(data)
             try:
-                sleep(0.3)
+                # time.sleep(0.3)
                 s.send(bytes(data,encoding='utf-8'))
             except socket.error as e:
                 if chk == False:
@@ -219,7 +215,7 @@ def backsub():
 
     # free up memory
     s.close()
-    print('socket closed')
+    print('Socket closed')
     camera.release()
     cv2.destroyAllWindows()
     return
