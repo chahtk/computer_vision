@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import socket
-import time
 
 th_pb=20
 ip='192.168.0.53'
